@@ -1,0 +1,27 @@
+OrdererOrgs:
+  - Name: Orderer
+    Domain: orderer.tpsr.com
+    Specs:
+      - Hostname: orderer0
+
+PeerOrgs:
+  - Name: VendorOrg
+    Domain: vendor.tpsr.com
+    Template:
+      Count: 1
+    Users:
+      Count: 2
+
+  - Name: SecurityOrg
+    Domain: security.tpsr.com
+    Template:
+      Count: 1
+    Users:
+      Count: 2
+
+  - Name: AuditorOrg
+    Domain: auditor.tpsr.com
+    Template:
+      Count: 1
+    Users:
+      Count: 1
