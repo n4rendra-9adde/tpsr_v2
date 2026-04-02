@@ -1,0 +1,119 @@
+stages:
+  - tpsr_submit
+
+.tpsr_submit_sbom:
+  stage: tpsr_submit
+  image: python:3.11-slim
+  before_script:
+    - echo "TPSR: Initializing SBOM submission job"
+    - python3 --version || (echo "Python3 is required" && exit 1)
+    - command -v curl >/dev/null 2>&1 || (apt-get update && apt-get install -y curl)
+  script:
+    - |
+      for var in TPSR_API_BASE_URL TPSR_USER_ID TPSR_USER_ROLE TPSR_SBOM_ID TPSR_SBOM_FILE TPSR_BUILD_ID TPSR_SOFTWARE_NAME TPSR_SOFTWARE_VERSION TPSR_FORMAT TPSR_OFFCHAIN_REF TPSR_SIGNATURES_JSON; do
+        eval "val=\$$var"
+        if [ -z "$val" ]; then
+          echo "Error: Required variable $var is missing or empty"
+          exit 1
+        fi
+      done
+
+      if [ "$TPSR_FORMAT" != "SPDX" ] && [ "$TPSR_FORMAT" != "CycloneDX" ]; then
+        echo "Error: TPSR_FORMAT must be SPDX or CycloneDX"
+        exit 1
+      fi
+
+      if [ "$TPSR_USER_ROLE" != "developer" ] && [ "$TPSR_USER_ROLE" != "security" ] && [ "$TPSR_USER_ROLE" != "auditor" ] && [ "$TPSR_USER_ROLE" != "admin" ]; then
+        echo "Error: Invalid TPSR_USER_ROLE"
+        exit 1
+      fi
+
+      if [ ! -f "$TPSR_SBOM_FILE" ]; then
+        echo "SBOM file not found: $TPSR_SBOM_FILE"
+        exit 1
+      fi
+
+      if [ ! -s "$TPSR_SBOM_FILE" ] || [ -z "$(cat "$TPSR_SBOM_FILE")" ]; then
+        echo "SBOM file is empty: $TPSR_SBOM_FILE"
+        exit 1
+      fi
+
+      API_URL="${TPSR_API_BASE_URL%/}"
+
+      python3 -c '
+      import json, sys, os
+      
+      try:
+          sigs = json.loads(os.environ["TPSR_SIGNATURES_JSON"])
+          if not isinstance(sigs, list) or len(sigs) == 0:
+              print("Error: TPSR_SIGNATURES_JSON must be a non-empty JSON array")
+              sys.exit(1)
+          for s in sigs:
+              if not isinstance(s, str) or not s.strip():
+                  print("Error: Every item in TPSR_SIGNATURES_JSON must be a non-empty string")
+                  sys.exit(1)
+      except Exception as e:
+          print("Error parsing TPSR_SIGNATURES_JSON:", str(e))
+          sys.exit(1)
+
+      with open(os.environ["TPSR_SBOM_FILE"], "r") as f:
+          sbom_content = f.read().strip()
+
+      payload = {
+          "sbomID": os.environ["TPSR_SBOM_ID"].strip(),
+          "sbom": sbom_content,
+          "buildID": os.environ["TPSR_BUILD_ID"].strip(),
+          "softwareName": os.environ["TPSR_SOFTWARE_NAME"].strip(),
+          "softwareVersion": os.environ["TPSR_SOFTWARE_VERSION"].strip(),
+          "format": os.environ["TPSR_FORMAT"].strip(),
+          "offChainRef": os.environ["TPSR_OFFCHAIN_REF"].strip(),
+          "signatures": [s.strip() for s in sigs]
+      }
+
+      with open("tpsr_payload.json", "w") as f:
+          json.dump(payload, f)
+      ' || exit 1
+
+      echo "TPSR: Submitting SBOM $TPSR_SBOM_ID (Format: $TPSR_FORMAT) to $API_URL/submit"
+      echo "TPSR: Build ID: $TPSR_BUILD_ID, Software: $TPSR_SOFTWARE_NAME"
+
+      curl -s -w "%{http_code}" -X POST \
+        -H "Content-Type: application/json" \
+        -H "x-user-id: $TPSR_USER_ID" \
+        -H "x-user-role: $TPSR_USER_ROLE" \
+        -d @tpsr_payload.json \
+        -o tpsr_response.json \
+        "$API_URL/submit" > tpsr_status.txt
+
+      STATUS_CODE=$(cat tpsr_status.txt)
+      
+      python3 -c '
+      import json, sys
+      
+      status_code = sys.argv[1]
+      try:
+          with open("tpsr_response.json", "r") as f:
+              resp_text = f.read().strip()
+              if not resp_text:
+                  resp = {}
+              else:
+                  resp = json.loads(resp_text)
+      except Exception:
+          if status_code == "201":
+              print("TPSR submission returned invalid JSON")
+          else:
+              print(f"TPSR submission failed with HTTP {status_code}")
+          sys.exit(1)
+
+      if status_code == "201":
+          print(f"TPSR: Successfully submitted SBOM. ID: {resp.get(\"sbomID\", \"Unknown\")}, Hash: {resp.get(\"hash\", \"Unknown\")}")
+          sys.exit(0)
+      else:
+          if "error" in resp and "details" in resp:
+              print(f"Error: {resp[\"error\"]} - {resp[\"details\"]}")
+          elif "error" in resp:
+              print(f"Error: {resp[\"error\"]}")
+          else:
+              print(f"TPSR submission failed with HTTP {status_code}")
+          sys.exit(1)
+      ' "$STATUS_CODE" || exit 1

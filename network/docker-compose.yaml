@@ -203,4 +203,5 @@ volumes:
 
 networks:
   tpsr-network:
+    name: tpsr-network
     driver: bridge

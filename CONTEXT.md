@@ -11,9 +11,7 @@ Step 1.3 — Initialize Node.js API package.json
 Step 1.4 — Initialize React dashboard package.json
 Step 2.1 — Create crypto-config.yaml
 Step 2.2 — Create configtx.yaml
-### CURRENT STEP
 Step 2.3 — Create docker-compose.yaml
-### PENDING STEPS
 Step 2.4 — Generate certificates
 Step 2.5 — Start network and verify
 Step 2.6 — Create channel and verify
@@ -23,6 +21,7 @@ Step 3.3 — Write VerifyIntegrity function
 Step 3.4 — Write GetHistory function
 Step 3.5 — Write error handling
 Step 3.6 — Write unit tests
+Step 3.6A — Create chaincode main.go
 Step 3.7 — Deploy and test chaincode
 Step 4.1 — Setup Express server
 Step 4.2 — Setup Fabric SDK connection
@@ -47,6 +46,17 @@ Step 7.1 — Functional testing
 Step 7.2 — Performance testing
 Step 7.3 — Security testing
 Step 7.4 — Tamper detection validation
+*** Testing Phase Complete ***
+Step 8.1 — Create deployment runbook (tpsr/DEPLOYMENT.md)
+Step 8.2 — Create project README (tpsr/README.md)
+Step 8.3 — Add /api/sboms endpoint + complete dashboard live integration
+Step 8.4 — Production hardening and final deployment packaging
+*** Deployment Packaging Phase Complete ***
+Step 9.1 — Deploy the packaged system (tpsr/deployment/deploy.sh + deploy.env.example + DEPLOYMENT-EXECUTION.md)
+Step 9.2 — Validate live deployment (tpsr/deployment/VALIDATION.md)
+
+### CURRENT STEP
+Step 9.3 — Final system audit and project closure
 ## Key Architecture Decisions
 Blockchain — Hyperledger Fabric 2.5 with Raft consensus
 Organizations — Vendor, Security Team, Auditor

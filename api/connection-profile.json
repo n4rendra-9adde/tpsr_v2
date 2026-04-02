@@ -1,0 +1,83 @@
+{
+  "name": "tpsr-network",
+  "version": "1.0.0",
+  "client": {
+    "organization": "VendorOrg"
+  },
+  "organizations": {
+    "VendorOrg": {
+      "mspid": "VendorMSP",
+      "peers": [
+        "peer0.vendor.tpsr.com"
+      ]
+    },
+    "SecurityOrg": {
+      "mspid": "SecurityMSP",
+      "peers": [
+        "peer0.security.tpsr.com"
+      ]
+    },
+    "AuditorOrg": {
+      "mspid": "AuditorMSP",
+      "peers": [
+        "peer0.auditor.tpsr.com"
+      ]
+    }
+  },
+  "orderers": {
+    "orderer0.orderer.tpsr.com": {
+      "url": "grpcs://orderer0.orderer.tpsr.com:7050",
+      "tlsCACerts": {
+        "path": "../network/crypto-config/ordererOrganizations/orderer.tpsr.com/orderers/orderer0.orderer.tpsr.com/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "orderer0.orderer.tpsr.com",
+        "hostnameOverride": "orderer0.orderer.tpsr.com"
+      }
+    }
+  },
+  "peers": {
+    "peer0.vendor.tpsr.com": {
+      "url": "grpcs://peer0.vendor.tpsr.com:7051",
+      "tlsCACerts": {
+        "path": "../network/crypto-config/peerOrganizations/vendor.tpsr.com/peers/peer0.vendor.tpsr.com/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.vendor.tpsr.com",
+        "hostnameOverride": "peer0.vendor.tpsr.com"
+      }
+    },
+    "peer0.security.tpsr.com": {
+      "url": "grpcs://peer0.security.tpsr.com:8051",
+      "tlsCACerts": {
+        "path": "../network/crypto-config/peerOrganizations/security.tpsr.com/peers/peer0.security.tpsr.com/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.security.tpsr.com",
+        "hostnameOverride": "peer0.security.tpsr.com"
+      }
+    },
+    "peer0.auditor.tpsr.com": {
+      "url": "grpcs://peer0.auditor.tpsr.com:9051",
+      "tlsCACerts": {
+        "path": "../network/crypto-config/peerOrganizations/auditor.tpsr.com/peers/peer0.auditor.tpsr.com/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.auditor.tpsr.com",
+        "hostnameOverride": "peer0.auditor.tpsr.com"
+      }
+    }
+  },
+  "channels": {
+    "tpsrchannel": {
+      "orderers": [
+        "orderer0.orderer.tpsr.com"
+      ],
+      "peers": {
+        "peer0.vendor.tpsr.com": {},
+        "peer0.security.tpsr.com": {},
+        "peer0.auditor.tpsr.com": {}
+      }
+    }
+  }
+}

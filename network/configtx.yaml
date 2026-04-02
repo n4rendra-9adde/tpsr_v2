@@ -13,6 +13,8 @@ Organizations:
       Admins:
         Type: ImplicitMeta
         Rule: "MAJORITY Admins"
+    OrdererEndpoints:
+      - orderer0.orderer.tpsr.com:7050
 
   - &VendorOrg
     Name: VendorOrg
@@ -20,14 +22,17 @@ Organizations:
     MSPDir: crypto-config/peerOrganizations/vendor.tpsr.com/msp
     Policies:
       Readers:
-        Type: ImplicitMeta
-        Rule: "ANY Readers"
+        Type: Signature
+        Rule: "OR('VendorMSP.admin', 'VendorMSP.peer', 'VendorMSP.client')"
       Writers:
-        Type: ImplicitMeta
-        Rule: "ANY Writers"
+        Type: Signature
+        Rule: "OR('VendorMSP.admin', 'VendorMSP.client')"
       Admins:
-        Type: ImplicitMeta
-        Rule: "MAJORITY Admins"
+        Type: Signature
+        Rule: "OR('VendorMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('VendorMSP.member')"
     AnchorPeers:
       - Host: peer0.vendor.tpsr.com
         Port: 7051
@@ -38,14 +43,17 @@ Organizations:
     MSPDir: crypto-config/peerOrganizations/security.tpsr.com/msp
     Policies:
       Readers:
-        Type: ImplicitMeta
-        Rule: "ANY Readers"
+        Type: Signature
+        Rule: "OR('SecurityMSP.admin', 'SecurityMSP.peer', 'SecurityMSP.client')"
       Writers:
-        Type: ImplicitMeta
-        Rule: "ANY Writers"
+        Type: Signature
+        Rule: "OR('SecurityMSP.admin', 'SecurityMSP.client')"
       Admins:
-        Type: ImplicitMeta
-        Rule: "MAJORITY Admins"
+        Type: Signature
+        Rule: "OR('SecurityMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('SecurityMSP.member')"
     AnchorPeers:
       - Host: peer0.security.tpsr.com
         Port: 8051
@@ -56,14 +64,17 @@ Organizations:
     MSPDir: crypto-config/peerOrganizations/auditor.tpsr.com/msp
     Policies:
       Readers:
-        Type: ImplicitMeta
-        Rule: "ANY Readers"
+        Type: Signature
+        Rule: "OR('AuditorMSP.admin', 'AuditorMSP.peer', 'AuditorMSP.client')"
       Writers:
-        Type: ImplicitMeta
-        Rule: "ANY Writers"
+        Type: Signature
+        Rule: "OR('AuditorMSP.admin', 'AuditorMSP.client')"
       Admins:
-        Type: ImplicitMeta
-        Rule: "MAJORITY Admins"
+        Type: Signature
+        Rule: "OR('AuditorMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('AuditorMSP.member')"
     AnchorPeers:
       - Host: peer0.auditor.tpsr.com
         Port: 9051
@@ -156,9 +167,16 @@ Profiles:
           - *VendorOrg
           - *SecurityOrg
           - *AuditorOrg
+
   TPSRChannel:
     Consortium: TPSRConsortium
     <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+      Capabilities:
+        <<: *OrdererCapabilities
     Application:
       <<: *ApplicationDefaults
       Organizations:

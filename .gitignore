@@ -1,0 +1,29 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts
+dashboard/build/
+
+# Environment files (keep examples, ignore actuals)
+.env
+!.env.example
+
+# Fabric wallet & crypto material
+api/wallet/
+network/crypto-config/
+network/channel-artifacts/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Go build cache
+*.test
+*.out
+
+# OS
+.DS_Store
+Thumbs.db
