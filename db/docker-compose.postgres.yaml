@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: tpsr-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tpsr
+      POSTGRES_USER: tpsr
+      POSTGRES_PASSWORD: tpsrpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tpsr -d tpsr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:

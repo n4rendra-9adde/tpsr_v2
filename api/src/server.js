@@ -8,6 +8,7 @@ var helmet = require('helmet');
 var rateLimit = require('express-rate-limit');
 
 var auth = require('./middleware/auth');
+var db = require('./config/database');
 
 var submitRoute = require('./routes/submit');
 var verifyRoute = require('./routes/verify');
@@ -114,6 +115,37 @@ app.use(function (err, req, res, next) {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, function () {
-  console.log('TPSR API server running on port ' + PORT);
-});
+async function startServer() {
+  console.log('[TPSR] Testing database connection...');
+  try {
+    await db.testDatabaseConnection();
+    console.log('[TPSR] Database connection verified.');
+  } catch (err) {
+    console.error('[TPSR] Database connection failed:', err.message || err);
+    process.exit(1);
+  }
+
+  var server = app.listen(PORT, function () {
+    console.log('TPSR API server running on port ' + PORT);
+  });
+
+  function shutdown(signal) {
+    console.log('[TPSR] Received ' + signal + '. Shutting down gracefully...');
+    server.close(function () {
+      db.closeDatabasePool()
+        .then(function () {
+          console.log('[TPSR] Database pool closed. Exiting.');
+          process.exit(0);
+        })
+        .catch(function (err) {
+          console.error('[TPSR] Error closing database pool:', err.message || err);
+          process.exit(1);
+        });
+    });
+  }
+
+  process.on('SIGINT', function () { shutdown('SIGINT'); });
+  process.on('SIGTERM', function () { shutdown('SIGTERM'); });
+}
+
+startServer();

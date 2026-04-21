@@ -4,6 +4,7 @@ var express = require('express');
 var router = express.Router();
 
 var fabric = require('../config/fabric');
+var sbomRepository = require('../repositories/sbomRepository');
 var canonicalize = require('../utils/canonicalize');
 var hash = require('../utils/hash');
 
@@ -38,6 +39,20 @@ router.post('/verify', async function (req, res) {
       return res.status(400).json({ error: err.message });
     }
 
+    var pgDocument;
+    try {
+      pgDocument = await sbomRepository.getSBOMDocumentBySBOMID(sbomID);
+    } catch (err) {
+      return res.status(500).json({
+        error: 'Failed to verify SBOM',
+        details: err.message,
+      });
+    }
+
+    if (!pgDocument) {
+      return res.status(404).json({ error: 'SBOM record not found' });
+    }
+
     var result = await fabric.getContract();
     gateway = result.gateway;
     var contract = result.contract;
@@ -50,6 +65,21 @@ router.post('/verify', async function (req, res) {
 
     var resultString = resultBuffer.toString('utf8');
     var verificationResult = JSON.parse(resultString);
+
+    try {
+      await sbomRepository.insertVerificationEvent({
+        sbomDocumentID: pgDocument.id,
+        submittedHash: submittedHash,
+        storedHash: verificationResult.storedHash || pgDocument.sbom_hash,
+        match: verificationResult.match,
+        verifiedBy: req.headers['x-user-id'] || 'anonymous',
+        verifierRole: req.headers['x-user-role'] || 'unknown',
+        verificationMode: 'API',
+        fabricTxID: null
+      });
+    } catch (dbErr) {
+      console.error('[TPSR] Failed to insert verification event:', dbErr.message);
+    }
 
     return res.status(200).json({
       message: 'SBOM verification completed',

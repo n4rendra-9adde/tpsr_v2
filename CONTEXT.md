@@ -54,9 +54,39 @@ Step 8.4 — Production hardening and final deployment packaging
 *** Deployment Packaging Phase Complete ***
 Step 9.1 — Deploy the packaged system (tpsr/deployment/deploy.sh + deploy.env.example + DEPLOYMENT-EXECUTION.md)
 Step 9.2 — Validate live deployment (tpsr/deployment/VALIDATION.md)
+Step 9.3 — Final system audit and project closure
+*** Phase 1 Complete ***
+Phase 2 — Hybrid Storage and Provenance Layer
+Step 2.1B — Create initial PostgreSQL migration (tpsr/db/migrations/001_init_postgresql.sql)
+Step 2.1C — Add PostgreSQL environment placeholders and DB connection module (tpsr/api/src/config/database.js)
+Step 2.1D — Create PostgreSQL local runtime configuration (tpsr/db/docker-compose.postgres.yaml)
+Step 2.1E — Start local PostgreSQL runtime and verify readiness
+Step 2.1F — Apply the initial PostgreSQL migration and verify schema creation
+Step 2.1G — Wire PostgreSQL startup validation into the API (tpsr/api/src/server.js)
+Step 2.1H — Start TPSR API with PostgreSQL enabled and verify startup
+Step 2.2A — Create PostgreSQL data-access module for SBOM documents and artifact records
+Step 2.2B — Extend repository with SBOM document finalization update
+Step 2.2C — Extend repository with rollback delete helper
+Step 2.2D — Integrate PostgreSQL into submit route with rollback-safe two-phase persistence
+Step 2.2E — Extend repository with SBOM list query for PostgreSQL-backed /api/sboms
+Step 2.2F — Rewire `/api/sboms` route to PostgreSQL-backed listing
+Step 2.2G — Start API and verify PostgreSQL-backed `/api/sboms` runtime
+Step 2.2H — Runtime validate the new two-phase submit flow (PostgreSQL + Fabric)
+Step 2.2I.1 — Extend repository with verification event insert helper
+Step 2.2I.2 — Rewire `verify.js` to use PostgreSQL + Fabric hybrid verification
+Step 2.2I.3 — Runtime validate hybrid verification and verification event persistence
+Step 2.2J.1 — Extend repository with compliance report insert helper
+Step 2.2J.2 — Rewire `compliance-report.js` to use PostgreSQL + Fabric hybrid compliance persistence
+Step 2.2J.3 — Runtime validate hybrid compliance report and compliance report persistence
+Step 2.2K — Rewire `history.js` to use PostgreSQL + Fabric hybrid history
+Step 2.2K.1 — Runtime validate hybrid history response
+Step 2.2L — Capture and persist Fabric transaction ID in PostgreSQL finalization
+Step 2.2L.1 — Runtime validate Fabric transaction ID persistence
+Step 2.2M — Capture and persist Fabric submitter identity in PostgreSQL finalization
+Step 2.2M.1 — Runtime validate submitterID persistence
 
 ### CURRENT STEP
-Step 9.3 — Final system audit and project closure
+Step 2.2N — Runtime regression validate the complete hybrid API flow
 ## Key Architecture Decisions
 Blockchain — Hyperledger Fabric 2.5 with Raft consensus
 Organizations — Vendor, Security Team, Auditor

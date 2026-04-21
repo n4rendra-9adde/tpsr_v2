@@ -1,45 +1,26 @@
 'use strict';
 
-const express = require('express');
-const { getContract, disconnectGateway } = require('../config/fabric');
+var express = require('express');
+var router = express.Router();
 
-const router = express.Router();
+var sbomRepository = require('../repositories/sbomRepository');
 
-router.get('/sboms', async (req, res) => {
-  let gateway;
+router.get('/sboms', async function (req, res) {
   try {
-    const fabricConfig = await getContract();
-    gateway = fabricConfig.gateway;
-    const contract = fabricConfig.contract;
+    var limit = req.query.limit;
+    
+    var sboms = await sbomRepository.listSBOMDocuments(limit);
 
-    const resultBuffer = await contract.evaluateTransaction('ListSBOMs');
-    const resultString = resultBuffer.toString('utf8');
-
-    let parsedArray;
-    try {
-      parsedArray = JSON.parse(resultString || '[]');
-    } catch (parseErr) {
-      return res.status(500).json({ error: 'Failed to parse SBOM list response' });
-    }
-
-    if (!Array.isArray(parsedArray)) {
-      return res.status(500).json({ error: 'Failed to parse SBOM list response' });
-    }
-
-    res.status(200).json({
+    return res.status(200).json({
       message: 'SBOM list retrieved successfully',
-      count: parsedArray.length,
-      sboms: parsedArray
+      count: sboms.length,
+      sboms: sboms
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Failed to retrieve SBOM list',
       details: error.message || String(error)
     });
-  } finally {
-    if (gateway) {
-      await disconnectGateway(gateway);
-    }
   }
 });
 

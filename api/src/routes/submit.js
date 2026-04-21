@@ -4,6 +4,7 @@ var express = require('express');
 var router = express.Router();
 
 var fabric = require('../config/fabric');
+var sbomRepository = require('../repositories/sbomRepository');
 var canonicalize = require('../utils/canonicalize');
 var hash = require('../utils/hash');
 
@@ -74,6 +75,28 @@ router.post('/submit', async function (req, res) {
       return res.status(400).json({ error: sigError });
     }
 
+    var artifactHash = body.artifactHash;
+    if (typeof artifactHash !== 'string' || !/^[a-f0-9]{64}$/.test(artifactHash)) {
+      return res.status(400).json({ error: 'artifactHash must be a non-empty 64-character lowercase hex string' });
+    }
+
+    var artifactName = body.artifactName;
+    if (typeof artifactName !== 'string' || artifactName.trim() === '') {
+      return res.status(400).json({ error: 'artifactName must be a non-empty string' });
+    }
+
+    var artifactType = body.artifactType;
+    var validTypes = ['JAR', 'IMAGE', 'BINARY', 'ARCHIVE', 'OTHER'];
+    if (typeof artifactType !== 'string' || validTypes.indexOf(artifactType.trim()) === -1) {
+      return res.status(400).json({ error: 'artifactType must be one of: JAR, IMAGE, BINARY, ARCHIVE, OTHER' });
+    }
+
+    if (body.sizeBytes !== undefined && body.sizeBytes !== null) {
+      if (!Number.isInteger(body.sizeBytes) || body.sizeBytes < 0) {
+        return res.status(400).json({ error: 'sizeBytes must be a non-negative integer' });
+      }
+    }
+
     var sbomID = body.sbomID.trim();
     var sbom = body.sbom;
     var buildID = body.buildID.trim();
@@ -93,21 +116,105 @@ router.post('/submit', async function (req, res) {
       return res.status(400).json({ error: err.message });
     }
 
+    var parsedSBOMJSON;
+    try {
+      parsedSBOMJSON = JSON.parse(canonicalizedSBOM);
+    } catch (e) {
+      parsedSBOMJSON = typeof sbom === 'object' ? sbom : { raw: sbom };
+    }
+
+    var insertedSBOMDoc;
+    try {
+      insertedSBOMDoc = await sbomRepository.insertSBOMDocument({
+        sbomID: sbomID,
+        buildID: buildID,
+        softwareName: softwareName,
+        softwareVersion: softwareVersion,
+        format: format,
+        status: 'PENDING',
+        sbomHash: sbomHash,
+        sbomJSON: parsedSBOMJSON,
+        requestedBy: req.headers['x-user-id'] || null,
+        jobName: body.jobName || null,
+        buildNumber: buildID,
+        gitCommit: body.gitCommit || null,
+        gitBranch: body.gitBranch || null,
+        repositoryURL: body.repositoryURL || null,
+        offChainRef: offChainRef,
+        fabricTxID: null,
+        signatures: signatures,
+        canonicalizationVersion: 'v1'
+      });
+
+      await sbomRepository.insertArtifactRecord({
+        sbomDocumentID: insertedSBOMDoc.id,
+        artifactType: artifactType.trim(),
+        artifactName: artifactName.trim(),
+        artifactHash: artifactHash,
+        artifactURI: body.artifactURI || null,
+        sizeBytes: body.sizeBytes !== undefined && body.sizeBytes !== null ? body.sizeBytes : null
+      });
+    } catch (dbErr) {
+      if (insertedSBOMDoc && insertedSBOMDoc.id) {
+        await sbomRepository.deleteSBOMDocumentByID(insertedSBOMDoc.id).catch(function(e) {
+          console.error('[TPSR] Failed to rollback SBOM document after artifact insert error:', e.message);
+        });
+      }
+      return res.status(500).json({
+        error: 'Failed to persist SBOM to database',
+        details: dbErr.message,
+      });
+    }
+
     var result = await fabric.getContract();
     gateway = result.gateway;
     var contract = result.contract;
 
-    await contract.submitTransaction(
-      'SubmitSBOM',
-      sbomID,
-      sbomHash,
-      buildID,
-      softwareName,
-      softwareVersion,
-      format,
-      offChainRef,
-      JSON.stringify(signatures)
-    );
+    var fabricTxID;
+    try {
+      var transaction = contract.createTransaction('SubmitSBOM');
+      fabricTxID = transaction.getTransactionId();
+      
+      await transaction.submit(
+        sbomID,
+        sbomHash,
+        buildID,
+        softwareName,
+        softwareVersion,
+        format,
+        offChainRef,
+        JSON.stringify(signatures)
+      );
+    } catch (fabricErr) {
+      await sbomRepository.deleteSBOMDocumentByID(insertedSBOMDoc.id).catch(function(e) {
+        console.error('[TPSR] Failed to rollback SBOM document:', e.message);
+      });
+      throw fabricErr;
+    }
+
+    var submitterID = null;
+    try {
+      var historyBuffer = await contract.evaluateTransaction('GetHistory', sbomID);
+      var historyArray = JSON.parse(historyBuffer.toString('utf8'));
+      if (Array.isArray(historyArray) && historyArray.length > 0) {
+        var latestTx = historyArray[historyArray.length - 1];
+        if (latestTx && latestTx.record && latestTx.record.submitterID) {
+          submitterID = latestTx.record.submitterID;
+        }
+      }
+    } catch (historyErr) {
+      console.error('[TPSR] Failed to fetch or parse history for submitter ID:', historyErr.message);
+    }
+
+    await sbomRepository.finalizeSBOMDocument({
+      id: insertedSBOMDoc.id,
+      fabricTxID: fabricTxID,
+      offChainRef: offChainRef,
+      submitterID: submitterID,
+      status: 'PENDING'
+    }).catch(function(e) {
+      console.error('[TPSR] Failed to finalize SBOM document:', e.message);
+    });
 
     return res.status(201).json({
       message: 'SBOM submitted successfully',

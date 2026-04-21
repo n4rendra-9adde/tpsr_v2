@@ -4,6 +4,7 @@ var express = require('express');
 var router = express.Router();
 
 var fabric = require('../config/fabric');
+var sbomRepository = require('../repositories/sbomRepository');
 
 router.get('/history/:sbomID', async function (req, res) {
   var gateway = null;
@@ -16,6 +17,20 @@ router.get('/history/:sbomID', async function (req, res) {
     }
 
     var sbomID = sbomIDParam.trim();
+
+    var pgResult;
+    try {
+      pgResult = await sbomRepository.getSBOMDocumentWithArtifactsBySBOMID(sbomID);
+    } catch (err) {
+      return res.status(500).json({
+        error: 'Failed to retrieve SBOM history',
+        details: err.message,
+      });
+    }
+
+    if (!pgResult) {
+      return res.status(404).json({ error: 'SBOM record not found' });
+    }
 
     var result = await fabric.getContract();
     gateway = result.gateway;
@@ -40,7 +55,8 @@ router.get('/history/:sbomID', async function (req, res) {
 
     return res.status(200).json({
       message: 'SBOM history retrieved successfully',
-      sbomID: sbomID,
+      sbom: pgResult.document,
+      artifacts: pgResult.artifacts,
       history: historyArray
     });
   } catch (err) {
@@ -52,7 +68,9 @@ router.get('/history/:sbomID', async function (req, res) {
       details: err.message,
     });
   } finally {
-    fabric.disconnectGateway(gateway);
+    if (gateway) {
+      fabric.disconnectGateway(gateway);
+    }
   }
 });
 
