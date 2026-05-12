@@ -84,9 +84,21 @@ Step 2.2L — Capture and persist Fabric transaction ID in PostgreSQL finalizati
 Step 2.2L.1 — Runtime validate Fabric transaction ID persistence
 Step 2.2M — Capture and persist Fabric submitter identity in PostgreSQL finalization
 Step 2.2M.1 — Runtime validate submitterID persistence
+Step 2.2N — Runtime regression validate the complete hybrid API flow
+Step 2.3A — Extend Jenkins shared library to submit Phase-2 artifact and provenance fields
+Step 2.3B — Update Jenkins test pipeline to call the Phase-2 shared library fields
+Step 2.3C — Runtime validate Jenkins Phase-2 submission path
+Step 2.3D.1 — Runtime validate SBOM document fetch/download endpoint
+Step 2.3E — Add dashboard actions to view / copy / download stored SBOM JSON
+
+Step 2.3E.1 — Runtime validate dashboard View / Copy / Download SBOM actions
+Step 2.4A — Enhance Jenkins submission to pass richer provenance fields
+Step 2.4A.1 — Runtime validate Jenkins richer provenance fields
+Step 2.4B — Add Requested By and Job Name to dashboard SBOM list
+Step 2.5A — Add minimal SBOM lifecycle approval flow
 
 ### CURRENT STEP
-Step 2.2N — Runtime regression validate the complete hybrid API flow
+Step 2.5A.1 — Runtime validate SBOM lifecycle approval flow
 ## Key Architecture Decisions
 Blockchain — Hyperledger Fabric 2.5 with Raft consensus
 Organizations — Vendor, Security Team, Auditor

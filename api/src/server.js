@@ -15,6 +15,8 @@ var verifyRoute = require('./routes/verify');
 var historyRoute = require('./routes/history');
 var complianceReportRoute = require('./routes/compliance-report');
 var sbomsRoute = require('./routes/sboms');
+var approveRoute = require('./routes/approve');
+
 
 // Startup environment validation
 var REQUIRED_ENV = [
@@ -83,8 +85,11 @@ function getAllowedRoles(method, reqPath) {
   if (method === 'POST' && reqPath === '/compliance-report') {
     return auth.ROUTE_ROLE_MAP.compliance;
   }
-  if (method === 'GET' && reqPath === '/sboms') {
+  if (method === 'GET' && (reqPath === '/sboms' || reqPath.match(/^\/sboms\/[^\/]+\/document$/))) {
     return auth.ROUTE_ROLE_MAP.sboms;
+  }
+  if (method === 'POST' && reqPath === '/approve') {
+    return auth.ROUTE_ROLE_MAP.approve;
   }
   return null;
 }
@@ -105,6 +110,8 @@ app.use('/api', verifyRoute);
 app.use('/api', historyRoute);
 app.use('/api', complianceReportRoute);
 app.use('/api', sbomsRoute);
+app.use('/api', approveRoute);
+
 
 app.use(function (req, res) {
   res.status(404).json({ error: 'Route not found' });
@@ -148,4 +155,11 @@ async function startServer() {
   process.on('SIGTERM', function () { shutdown('SIGTERM'); });
 }
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = {
+  app: app,
+  startServer: startServer
+};

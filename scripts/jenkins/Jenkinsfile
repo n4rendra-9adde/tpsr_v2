@@ -1,0 +1,56 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Prepare Test SBOM') {
+            steps {
+                writeFile file: 'bom.json', text: '''{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "metadata": {
+    "component": {
+      "name": "test-artifact",
+      "version": "1.0.0"
+    }
+  }
+}'''
+            }
+        }
+        stage('Test TPSR Submission') {
+            steps {
+                script {
+                    def args = [
+                        apiBaseUrl: 'http://localhost:3000/api',
+                        userId: 'jenkins-service',
+                        role: 'developer',
+                        sbomID: "test-sbom-${env.BUILD_ID}",
+                        sbomFile: 'bom.json',
+                        buildID: env.BUILD_ID,
+                        softwareName: 'test-artifact',
+                        softwareVersion: '1.0.0',
+                        format: 'CycloneDX',
+                        offChainRef: 'http://nexus.local/test-artifact/1.0.0',
+                        signatures: ['mock-signature-123'],
+                        
+                        artifactHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+                        artifactName: 'test-artifact.jar',
+                        artifactType: 'JAR',
+                        jobName: env.JOB_NAME
+                    ]
+
+                    if (env.GIT_COMMIT?.trim()) {
+                        args.gitCommit = env.GIT_COMMIT.trim()
+                    }
+                    if (env.GIT_BRANCH?.trim()) {
+                        args.gitBranch = env.GIT_BRANCH.trim()
+                    }
+                    if (env.GIT_URL?.trim()) {
+                        args.repositoryURL = env.GIT_URL.trim()
+                    }
+
+                    tpsrSubmitSbom(args)
+                }
+            }
+        }
+    }
+}

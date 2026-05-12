@@ -8,6 +8,7 @@ var ROUTE_ROLE_MAP = {
   history: ['security', 'auditor', 'admin'],
   compliance: ['auditor', 'admin'],
   sboms: ['security', 'auditor', 'admin'],
+  approve: ['security', 'admin'],
 };
 
 function authenticateHeaders(req, res, next) {

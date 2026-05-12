@@ -23,5 +23,39 @@ router.get('/sboms', async function (req, res) {
     });
   }
 });
+router.get('/sboms/:sbomID/document', async function (req, res) {
+  try {
+    var sbomID = (req.params.sbomID || '').trim();
+    if (!sbomID) {
+      return res.status(400).json({ error: 'sbomID is required' });
+    }
+
+    var record = await sbomRepository.getSBOMDocumentBySBOMID(sbomID);
+    if (!record) {
+      return res.status(404).json({ error: 'SBOM record not found' });
+    }
+
+    if (req.query.download === 'true') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="' + sbomID + '.json"');
+      return res.send(JSON.stringify(record.sbom_json, null, 2));
+    }
+
+    return res.status(200).json({
+      message: 'SBOM document retrieved successfully',
+      sbomID: record.sbom_id,
+      format: record.format,
+      sbomHash: record.sbom_hash,
+      fabricTxID: record.fabric_tx_id,
+      submitterID: record.submitter_id,
+      sbom: record.sbom_json
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Failed to retrieve SBOM document',
+      details: error.message || String(error)
+    });
+  }
+});
 
 module.exports = router;

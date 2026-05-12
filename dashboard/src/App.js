@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Layout, Menu, Typography, Card, Row, Col, Table, Tag, Input, Select, Space, Button, Alert, Descriptions } from 'antd';
+import { Layout, Menu, Typography, Card, Row, Col, Table, Tag, Input, Select, Space, Button, Alert, Descriptions, Modal, message } from 'antd';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import axios from 'axios';
 
@@ -31,6 +31,10 @@ function SBOMListPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [sboms, setSboms] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedSbomId, setSelectedSbomId] = useState(null);
+  const [selectedSbomJson, setSelectedSbomJson] = useState('');
+  const [actionLoading, setActionLoading] = useState(null);
 
   useEffect(() => {
     fetchSboms();
@@ -43,7 +47,19 @@ function SBOMListPage() {
       const response = await axios.get(`${API_BASE_URL}/sboms`, {
         headers: { 'x-user-id': USER_ID, 'x-user-role': SBOMS_ROLE }
       });
-      setSboms(response.data.sboms || []);
+      const rawSboms = response.data.sboms || [];
+      const normalizedSboms = rawSboms.map(item => ({
+        ...item,
+        sbomID: item.sbomID ?? item.sbom_id,
+        softwareName: item.softwareName ?? item.software_name,
+        softwareVersion: item.softwareVersion ?? item.software_version,
+        buildID: item.buildID ?? item.build_id ?? item.build_number,
+        submitterID: item.submitterID ?? item.submitter_id,
+        timestamp: item.timestamp ?? item.created_at,
+        requestedBy: item.requestedBy ?? item.requested_by,
+        jobName: item.jobName ?? item.job_name
+      }));
+      setSboms(normalizedSboms);
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to load SBOM list';
       setErrorMsg(msg);
@@ -55,12 +71,81 @@ function SBOMListPage() {
   const filteredData = useMemo(() => {
     return sboms.filter((item) => {
       const matchStatus = statusFilter === 'All' || item.status === statusFilter;
-      const matchSearch =
-        (item.sbomID && item.sbomID.toLowerCase().includes(searchText.toLowerCase())) ||
-        (item.softwareName && item.softwareName.toLowerCase().includes(searchText.toLowerCase()));
+      const searchTrimmed = searchText.trim().toLowerCase();
+      const matchSearch = searchTrimmed === '' || 
+        (item.sbomID && item.sbomID.toLowerCase().includes(searchTrimmed)) ||
+        (item.softwareName && item.softwareName.toLowerCase().includes(searchTrimmed));
       return matchStatus && matchSearch;
     });
   }, [searchText, statusFilter, sboms]);
+
+  const fetchDocument = async (sbomID) => {
+    const response = await axios.get(`${API_BASE_URL}/sboms/${encodeURIComponent(sbomID)}/document`, {
+      headers: { 'x-user-id': USER_ID, 'x-user-role': SBOMS_ROLE }
+    });
+    return response.data;
+  };
+
+  const handleView = async (record) => {
+    try {
+      setActionLoading(`${record.sbomID}-view`);
+      const data = await fetchDocument(record.sbomID);
+      setSelectedSbomId(record.sbomID);
+      setSelectedSbomJson(JSON.stringify(data.sbom, null, 2));
+      setModalVisible(true);
+    } catch (err) {
+      message.error(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to fetch SBOM document');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCopy = async (record) => {
+    try {
+      setActionLoading(`${record.sbomID}-copy`);
+      const data = await fetchDocument(record.sbomID);
+      const jsonText = JSON.stringify(data.sbom, null, 2);
+      await navigator.clipboard.writeText(jsonText);
+      message.success('SBOM JSON copied to clipboard');
+    } catch (err) {
+      message.error(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to copy SBOM document');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDownload = async (record) => {
+    try {
+      setActionLoading(`${record.sbomID}-download`);
+      const response = await axios.get(`${API_BASE_URL}/sboms/${encodeURIComponent(record.sbomID)}/document?download=true`, {
+        headers: { 'x-user-id': USER_ID, 'x-user-role': SBOMS_ROLE },
+        responseType: 'blob'
+      });
+      
+      let filename = `${record.sbomID}.json`;
+      const disposition = response.headers['content-disposition'];
+      if (disposition && disposition.indexOf('filename=') !== -1) {
+        const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+        const matches = filenameRegex.exec(disposition);
+        if (matches != null && matches[1]) { 
+          filename = matches[1].replace(/['"]/g, '');
+        }
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      message.error('Failed to download SBOM document');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const total = sboms.length;
   const approved = sboms.filter((i) => i.status === 'APPROVED').length;
@@ -86,8 +171,21 @@ function SBOMListPage() {
       },
     },
     { title: 'Build ID', dataIndex: 'buildID', key: 'buildID' },
-    { title: 'Submitter', dataIndex: 'submitterID', key: 'submitterID' },
+    { title: 'Requested By', dataIndex: 'requestedBy', key: 'requestedBy', render: (text) => text || '-' },
+    { title: 'Job Name', dataIndex: 'jobName', key: 'jobName', render: (text) => text || '-' },
+    { title: 'Submitter', dataIndex: 'submitterID', key: 'submitterID', render: (text) => text || '-' },
     { title: 'Timestamp', dataIndex: 'timestamp', key: 'timestamp' },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space size="small">
+          <Button size="small" loading={actionLoading === `${record.sbomID}-view`} onClick={() => handleView(record)}>View</Button>
+          <Button size="small" loading={actionLoading === `${record.sbomID}-copy`} onClick={() => handleCopy(record)}>Copy</Button>
+          <Button size="small" loading={actionLoading === `${record.sbomID}-download`} onClick={() => handleDownload(record)}>Download</Button>
+        </Space>
+      ),
+    },
   ];
 
   return (
@@ -158,6 +256,23 @@ function SBOMListPage() {
           loading={loading}
         />
       </Card>
+
+      <Modal
+        title={`SBOM JSON - ${selectedSbomId}`}
+        open={modalVisible}
+        onCancel={() => setModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setModalVisible(false)}>Close</Button>
+        ]}
+        width={800}
+      >
+        <Input.TextArea
+          value={selectedSbomJson}
+          rows={20}
+          readOnly
+          style={{ fontFamily: 'monospace' }}
+        />
+      </Modal>
     </div>
   );
 }

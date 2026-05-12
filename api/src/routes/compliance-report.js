@@ -89,7 +89,23 @@ router.post('/compliance-report', async function (req, res) {
     }
 
     var historyLen = historyArray.length;
-    var latestTx = historyLen > 0 ? historyArray[historyLen - 1] : null;
+    var latestTx = null;
+    if (historyLen > 0) {
+      for (var i = 0; i < historyLen; i++) {
+        var current = historyArray[i];
+        if (current) {
+          if (!latestTx) {
+            latestTx = current;
+          } else {
+            var currentTs = current.timestamp || 0;
+            var latestTs = latestTx.timestamp || 0;
+            if (currentTs > latestTs) {
+              latestTx = current;
+            }
+          }
+        }
+      }
+    }
 
     var complianceReport = {
       sbomID: sbomID,

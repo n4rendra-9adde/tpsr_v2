@@ -312,5 +312,40 @@ module.exports = {
   deleteSBOMDocumentByID: deleteSBOMDocumentByID,
   listSBOMDocuments: listSBOMDocuments,
   insertVerificationEvent: insertVerificationEvent,
-  insertComplianceReport: insertComplianceReport
+  insertComplianceReport: insertComplianceReport,
+  /**
+   * Update the status, optionally fabric_tx_id, and optionally submitter_id of an SBOM document.
+   * @param {string} sbomID
+   * @param {string} status
+   * @param {string} [fabricTxID]
+   * @param {string} [submitterID]
+   * @returns {Promise<Object>} The updated row.
+   */
+  updateSBOMStatus: async function(sbomID, status, fabricTxID, submitterID) {
+    var setClauses = ['status = $2'];
+    var values = [sbomID, status];
+    var paramIndex = 3;
+
+    if (fabricTxID) {
+      setClauses.push('fabric_tx_id = $' + paramIndex);
+      values.push(fabricTxID);
+      paramIndex++;
+    }
+
+    if (submitterID) {
+      setClauses.push('submitter_id = $' + paramIndex);
+      values.push(submitterID);
+      paramIndex++;
+    }
+
+    var query = 'UPDATE sbom_documents SET ' + setClauses.join(', ') + ' WHERE sbom_id = $1 RETURNING *;';
+
+    var client = await db.pool.connect();
+    try {
+      var result = await client.query(query, values);
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
 };
